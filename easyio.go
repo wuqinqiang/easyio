@@ -1,6 +1,17 @@
 package easyio
 
-import "fmt"
+import (
+	"fmt"
+	"syscall"
+)
+
+const (
+	ErrEvents = syscall.EPOLLERR | syscall.EPOLLHUP | syscall.EPOLLRDHUP
+
+	ReadEvents = syscall.EPOLLIN | syscall.EPOLLPRI
+
+	WriteEvents = syscall.EPOLLOUT
+)
 
 type ConnHandler interface {
 	OnOpen(c Conn)

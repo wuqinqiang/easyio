@@ -16,7 +16,7 @@ func NewManger(e *Engine, number int) (*Manger, error) {
 		p, err := NewPoller(e)
 		p.index = i
 		if err != nil {
-			m.Stop()
+			_ = m.Stop()
 			return nil, err
 		}
 		m.polls = append(m.polls, p)
@@ -40,7 +40,7 @@ func (m *Manger) init() {
 
 func (m *Manger) Stop() error {
 	for _, poller := range m.polls {
-		poller.Stop() //nolint:err
+		_ = poller.Close()
 	}
 	return nil
 }

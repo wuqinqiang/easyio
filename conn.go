@@ -102,14 +102,17 @@ func (c *conn) RemoteAddr() net.Addr {
 	return c.rAddr
 }
 
+// SetDeadline unSupport
 func (c *conn) SetDeadline(t time.Time) error {
 	return nil
 }
 
+// SetReadDeadline unSupport
 func (c *conn) SetReadDeadline(t time.Time) error {
 	return nil
 }
 
+// SetWriteDeadline unSupport
 func (c *conn) SetWriteDeadline(t time.Time) error {
 	return nil
 }

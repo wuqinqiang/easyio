@@ -2,6 +2,7 @@ package easyio
 
 import (
 	"fmt"
+	"net"
 	"runtime"
 )
 
@@ -14,18 +15,25 @@ type Option func(options *Options)
 type Options struct {
 	numPoller int
 	connEvent ConnHandler
+	Listener  func(network, addr string) (net.Listener, error) // Listener for accept conns
 }
 
-func New(network string, addr string, fns ...Option) *Engine {
+func New(network, addr string, fns ...Option) *Engine {
 	e := new(Engine)
-	o := new(Options)
+	opts := new(Options)
 	for _, opt := range fns {
-		opt(o)
+		opt(opts)
 	}
-	e.options = o
+
+	if opts.Listener == nil {
+		opts.Listener = net.Listen
+	}
+
+	e.options = opts
 	e.exitCh = make(chan struct{})
 	e.network = network
 	e.addr = addr
+
 	return e
 }
 
@@ -42,60 +50,60 @@ type Engine struct {
 	options *Options
 }
 
+func (e *Engine) acceptPolling(localOSThread bool) error {
+	if localOSThread {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+	}
+
+	for {
+		select {
+		case <-e.exitCh:
+			fmt.Println("engine out")
+			return nil
+		default:
+			nc, err := e.listener.Accept()
+			if err != nil {
+				fmt.Println("[listener] Accept:", err)
+				continue
+			}
+			if nc == nil {
+				continue
+			}
+			ec := nc.(*conn)
+			poller := e.pollerManger.Pick(ec.Fd())
+			if err = poller.AddRead(ec.Fd()); err != nil {
+				fmt.Println("poller.AddRead:", err)
+				nc.Close()
+				continue
+			}
+			e.conns[ec.Fd()] = ec
+		}
+	}
+}
+
 func (e *Engine) Start() (err error) {
 	fmt.Println("engine start")
-	defer func() {
-		if err != nil {
-			if e.listener != nil {
-				e.listener.Close() //nolint:err
-			}
-
-		}
-	}()
-
 	e.init()
+	// new a listener
 
-	e.listener, err = NewListener(e.network, e.addr)
+	listener := new(Listener)
+	listener.engine = e
+
+	ln, err := e.options.Listener(e.network, e.addr)
 	if err != nil {
 		return err
 	}
+	listener.ln = ln
+	listener.addr = ln.Addr()
+	e.listener = listener
 
 	//init poller manger
-	e.pollerManger, err = NewManger(e, e.options.numPoller)
-	if err != nil {
+	if e.pollerManger, err = NewManger(e, e.options.numPoller); err != nil {
 		return err
 	}
 
-	go func() {
-		for {
-			select {
-			case <-e.exitCh:
-				return
-			default:
-				nconn, err := e.listener.Accept()
-				if err != nil {
-					fmt.Println("[listener] Accept:", err)
-					//todo log
-					continue
-				}
-				if nconn == nil {
-					continue
-				}
-
-				ec := nconn.(*conn)
-				connfd := ec.Fd()
-				fmt.Println("new conn:", connfd)
-
-				poller := e.pollerManger.Pick(connfd)
-				if err = poller.AddRead(connfd); err != nil {
-					fmt.Println("poller.AddRead:", err)
-					nconn.Close()
-					return
-				}
-				e.conns[connfd] = ec
-			}
-		}
-	}()
+	go e.acceptPolling(true) //nolint:errcheck
 
 	return nil
 }
@@ -107,17 +115,15 @@ func (e *Engine) init() {
 	if e.options.connEvent == nil {
 		e.options.connEvent = new(Default)
 	}
-
 	e.conns = make([]Conn, MaxOpenFiles)
 }
 
 func (e *Engine) Stop() error {
-
+	close(e.exitCh)
 	// listener close
 	e.listener.Close()
 
 	// conns close
-
 	for _, conn := range e.conns {
 		if conn == nil {
 			continue

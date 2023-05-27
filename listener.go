@@ -19,7 +19,6 @@ var _ net.Listener = (*Listener)(nil)
 type Listener struct {
 	once   sync.Once
 	ln     net.Listener
-	connCh chan net.Conn
 	addr   net.Addr //local addr
 	engine *Engine
 }
@@ -29,27 +28,12 @@ func (ln *Listener) Close() error {
 		if ln.ln != nil {
 			ln.ln.Close()
 		}
-		close(ln.connCh)
 	})
 	return nil
 }
 
 func (ln *Listener) Addr() net.Addr {
 	return ln.addr
-}
-
-func NewListener(network, addr string) (*Listener, error) {
-	ln, err := net.Listen(network, addr)
-	if err != nil {
-		return nil, err
-	}
-
-	listener := new(Listener)
-	//listener.closeCh = make(chan struct{})
-	listener.ln = ln
-	listener.connCh = make(chan net.Conn, 100)
-	listener.addr = ln.Addr()
-	return listener, nil
 }
 
 func (ln *Listener) Accept() (net.Conn, error) {

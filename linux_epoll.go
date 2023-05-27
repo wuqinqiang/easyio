@@ -9,6 +9,7 @@ package easyio
 import (
 	"errors"
 	"fmt"
+	"runtime"
 	"sync/atomic"
 	"syscall"
 )
@@ -38,7 +39,6 @@ func NewPoller(e *Engine) (*Poller, error) {
 		syscall.Close(p.fd) //nolint:err
 		return nil, err0
 	}
-	fmt.Println("event fd:", r1)
 	p.wfd = int(r1)
 
 	if err = syscall.EpollCtl(fd, syscall.EPOLL_CTL_ADD, int(r1),
@@ -68,6 +68,7 @@ func (p *Poller) Wait() error {
 		// no event
 		if n <= 0 {
 			mesc = -1
+			runtime.Gosched()
 			continue
 		}
 		mesc = 20
@@ -81,35 +82,20 @@ func (p *Poller) Wait() error {
 				syscall.Close(int(event.Fd))
 				continue
 			}
-			// closed event
-			if event.Events&(syscall.EPOLLHUP|syscall.EPOLLRDHUP) != 0 {
-				//remove the conn
-				p.e.Remove(conn.Fd())
-				// delete  events
-				p.Delete(conn.Fd())
-				//close the fd
-				conn.Close()
-				continue
+
+			//写
+			if event.Events&WriteEvents != 0 {
+				conn.Flush()
 			}
 
 			//event Error
-			if event.Events&syscall.EPOLLERR != 0 {
-				fmt.Println("EPOLLERR error:", event)
-				continue
-			}
-
-			//判断是哪种事件
-			if event.Events&(syscall.EPOLLERR|syscall.EPOLLHUP|syscall.EPOLLRDHUP) != 0 {
+			if event.Events&ErrEvents != 0 {
 				conn.Close()
 				p.DeleteConn(conn)
 				continue
 			}
-			//写
-			if event.Events&syscall.EPOLLOUT != 0 {
-				conn.Flush()
-			}
-			//读
-			fmt.Println("event conn fd:", conn.Fd())
+
+			//read event
 			if event.Events&(syscall.EPOLLPRI|syscall.EPOLLIN) != 0 {
 				handler.OnRead(conn)
 			}
@@ -131,8 +117,9 @@ func (p *Poller) DeleteConn(conn Conn) {
 	}
 }
 
-func (p *Poller) Stop() error {
+func (p *Poller) Close() error {
 	p.shutdown.Store(true)
+	syscall.Close(p.wfd) //nolint:errcheck
 	return syscall.Close(p.fd)
 }
 
