@@ -5,6 +5,7 @@
 package easyio
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net"
@@ -19,11 +20,13 @@ type Conn interface {
 
 	Fd() int
 	Flush() error
+	Context() context.Context
 }
 
 var _ Conn = (*conn)(nil)
 
 type conn struct {
+	ctx         context.Context
 	fd          int
 	localAddr   net.Addr
 	rAddr       net.Addr
@@ -34,6 +37,10 @@ type conn struct {
 	mux    sync.RWMutex
 
 	poller *Poller
+}
+
+func (c *conn) Context() context.Context {
+	return c.ctx
 }
 
 func (c *conn) Flush() error {
@@ -48,7 +55,7 @@ func (c *conn) Flush() error {
 	n, err := c.Write(c.writeBuffer)
 	if err != nil && !errors.Is(err, syscall.EINTR) && !errors.Is(err, syscall.EAGAIN) {
 		c.Close()
-		c.poller.DeleteConn(c)
+		c.poller.removeConn(c)
 		return err
 	}
 	if n <= 0 {
@@ -76,7 +83,6 @@ func (c *conn) resetRead() {
 
 func (c *conn) Read(b []byte) (n int, err error) {
 	n, err = syscall.Read(c.fd, b)
-	fmt.Println("Conn Read:", n)
 	return
 }
 func (c *conn) Fd() int {
@@ -85,6 +91,7 @@ func (c *conn) Fd() int {
 
 func (c *conn) Write(b []byte) (n int, err error) {
 	n, err = syscall.Write(c.fd, b)
+	//todo to store unwritten data
 	return
 }
 

@@ -41,24 +41,20 @@ func (ln *Listener) Accept() (net.Conn, error) {
 	if err != nil {
 		var ne net.Error
 		if ok := errors.As(err, &ne); ok && ne.Timeout() {
+			//todo log
 			fmt.Println("Accept failed", err)
 			time.Sleep(time.Second)
 			return nil, nil
 		}
 		return nil, err
 	}
-
 	if conn == nil {
 		return nil, nil
 	}
-	c, ok := conn.(Conn)
+
+	ec, ok := conn.(Conn)
 	if !ok {
-		var err error
-		c, err = dupStdConn(conn)
-		if err != nil {
-			conn.Close()
-			return nil, err
-		}
+		ec, err = dupStdConn(conn)
 	}
-	return c, nil
+	return ec, err
 }

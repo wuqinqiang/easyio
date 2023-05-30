@@ -2,13 +2,12 @@
 // Use of this source code is governed by an MIT-style
 // license that can be found in the LICENSE file.
 
-//go:build linux
+//go:build linux || darwin || netbsd || freebsd || openbsd || dragonfly
 
 package easyio
 
 import (
 	"errors"
-	"fmt"
 	"runtime"
 	"sync/atomic"
 	"syscall"
@@ -58,7 +57,7 @@ func (p *Poller) Wait() error {
 	mesc := -1
 	events := make([]syscall.EpollEvent, 1024)
 
-	handler := p.e.options.connEvent
+	handler := p.e.options.event
 
 	for !p.shutdown.Load() {
 		n, err := syscall.EpollWait(p.fd, events, mesc)
@@ -75,29 +74,28 @@ func (p *Poller) Wait() error {
 
 		for i := 0; i < n; i++ {
 			event := events[i]
-			fmt.Printf("event:%+v\n", event)
+
 			//find conn
-			conn := p.e.GetConn(int(event.Fd))
-			if conn == nil {
+			c := p.e.GetConn(int(event.Fd))
+			if c == nil {
 				syscall.Close(int(event.Fd))
 				continue
 			}
 
 			//写
 			if event.Events&WriteEvents != 0 {
-				conn.Flush()
+				c.Flush()
 			}
 
 			//event Error
 			if event.Events&ErrEvents != 0 {
-				conn.Close()
-				p.DeleteConn(conn)
+				p.closeConn(c)
 				continue
 			}
 
 			//read event
-			if event.Events&(syscall.EPOLLPRI|syscall.EPOLLIN) != 0 {
-				handler.OnRead(conn)
+			if event.Events&ReadEvents != 0 {
+				handler.OnRead(c.Context(), c)
 			}
 		}
 	}
@@ -105,15 +103,29 @@ func (p *Poller) Wait() error {
 	return nil
 }
 
-func (p *Poller) DeleteConn(conn Conn) {
+func (p *Poller) closeConn(c Conn) {
+	if c == nil {
+		return
+	}
+
+	c.Close()
+	p.removeConn(c)
+
+	e := p.e.options.event
+	if e != nil {
+		e.OnClose(c.Context(), c)
+	}
+}
+
+func (p *Poller) removeConn(conn Conn) {
 	if conn == nil {
 		return
 	}
 
 	fd := conn.Fd()
-	if p.e.GetConn(fd) == conn {
+	if c := p.e.GetConn(fd); c != nil {
 		p.e.Remove(fd)
-		p.Delete(fd)
+		_ = p.Delete(fd)
 	}
 }
 

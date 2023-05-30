@@ -14,7 +14,7 @@ type Option func(options *Options)
 
 type Options struct {
 	numPoller int
-	connEvent ConnHandler
+	event     EventHandler
 	Listener  func(network, addr string) (net.Listener, error) // Listener for accept conns
 }
 
@@ -79,8 +79,8 @@ func (e *Engine) init() {
 	if e.options.numPoller <= 0 {
 		e.options.numPoller = runtime.NumCPU()
 	}
-	if e.options.connEvent == nil {
-		e.options.connEvent = new(Default)
+	if e.options.event == nil {
+		e.options.event = new(eventHandler)
 	}
 	e.conns = make([]Conn, MaxOpenFiles)
 }

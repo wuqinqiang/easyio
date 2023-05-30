@@ -3,13 +3,15 @@
 package easyio
 
 import (
+	"context"
 	"errors"
 	"net"
 	"syscall"
 )
 
-// fork from nbio!!!!
 func dupStdConn(netconn net.Conn) (Conn, error) {
+	defer netconn.Close()
+
 	sc, ok := netconn.(interface {
 		SyscallConn() (syscall.RawConn, error)
 	})
@@ -22,27 +24,17 @@ func dupStdConn(netconn net.Conn) (Conn, error) {
 	}
 
 	var newFd int
-	errCtrl := rc.Control(func(fd uintptr) {
+	if err = rc.Control(func(fd uintptr) {
 		newFd, err = syscall.Dup(int(fd))
-	})
-	if errCtrl != nil {
-		return nil, errCtrl
-	}
-
-	if err != nil {
+	}); err != nil {
 		return nil, err
 	}
 
-	lAddr := netconn.LocalAddr()
-	rAddr := netconn.RemoteAddr()
-
-	netconn.Close()
-
 	c := &conn{
 		fd:        newFd,
-		localAddr: lAddr,
-		rAddr:     rAddr,
+		localAddr: netconn.LocalAddr(),
+		rAddr:     netconn.RemoteAddr(),
+		ctx:       context.Background(),
 	}
-
 	return c, nil
 }

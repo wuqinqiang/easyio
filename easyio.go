@@ -1,6 +1,7 @@
 package easyio
 
 import (
+	"context"
 	"fmt"
 	"syscall"
 )
@@ -13,36 +14,30 @@ const (
 	WriteEvents = syscall.EPOLLOUT
 )
 
-type ConnHandler interface {
-	OnOpen(c Conn)
-	OnClose(c Conn)
-	OnRead(c Conn)
-	OnData(c Conn, data []byte)
+type EventHandler interface {
+	OnOpen(c Conn) context.Context
+	OnRead(ctx context.Context, c Conn)
+	OnClose(ctx context.Context, c Conn)
 }
 
-var _ ConnHandler = (*Default)(nil)
+var _ EventHandler = (*eventHandler)(nil)
 
-type Default struct{}
+type eventHandler struct{}
 
-func (d *Default) OnOpen(c Conn) {
-	panic("implement me")
+func (d *eventHandler) OnOpen(c Conn) context.Context {
+	return context.Background()
 }
 
-func (d *Default) OnClose(c Conn) {
-	//TODO implement me
-	panic("implement me")
+func (d *eventHandler) OnClose(_ context.Context, c Conn) {
+	fmt.Printf("[OnClose] conn: %d closed\n", c.Fd())
 }
 
-func (d *Default) OnRead(c Conn) {
-	b := make([]byte, 1024) // 分配足够的容量
+func (d *eventHandler) OnRead(ctx context.Context, c Conn) {
+	// todo set reader buffer
+	b := make([]byte, 1024)
 	n, err := c.Read(b[:cap(b)])
 	if err != nil {
 		fmt.Println("OnRead err:", err)
 	}
-	fmt.Printf("data len:%v,data:%v\n", n, string(b[:n]))
-}
-
-func (d *Default) OnData(c Conn, data []byte) {
-	//TODO implement me
-	panic("implement me")
+	fmt.Println("read data: ", string(b[:n]))
 }
