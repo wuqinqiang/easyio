@@ -1,7 +1,5 @@
 package easyio
 
-import "fmt"
-
 type Manger struct {
 	num int
 	//balance
@@ -21,20 +19,15 @@ func NewManger(e *Engine, number int) (*Manger, error) {
 		}
 		m.polls = append(m.polls, p)
 	}
-	m.init()
 
+	m.init()
 	return m, nil
 }
 
 func (m *Manger) init() {
 	for _, poller := range m.polls {
 		p := poller
-		go func() {
-			if err := p.Wait(); err != nil {
-				fmt.Println("Wait err:", err)
-			}
-
-		}()
+		go p.Wait()
 	}
 }
 

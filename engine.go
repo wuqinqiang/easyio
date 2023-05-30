@@ -50,50 +50,17 @@ type Engine struct {
 	options *Options
 }
 
-func (e *Engine) acceptPolling(localOSThread bool) error {
-	if localOSThread {
-		runtime.LockOSThread()
-		defer runtime.UnlockOSThread()
-	}
-
-	for {
-		select {
-		case <-e.exitCh:
-			fmt.Println("engine out")
-			return nil
-		default:
-			nc, err := e.listener.Accept()
-			if err != nil {
-				fmt.Println("[listener] Accept:", err)
-				continue
-			}
-			if nc == nil {
-				continue
-			}
-			ec := nc.(*conn)
-			poller := e.pollerManger.Pick(ec.Fd())
-			if err = poller.AddRead(ec.Fd()); err != nil {
-				fmt.Println("poller.AddRead:", err)
-				nc.Close()
-				continue
-			}
-			e.conns[ec.Fd()] = ec
-		}
-	}
-}
-
 func (e *Engine) Start() (err error) {
 	fmt.Println("engine start")
 	e.init()
 	// new a listener
-
-	listener := new(Listener)
-	listener.engine = e
-
 	ln, err := e.options.Listener(e.network, e.addr)
 	if err != nil {
 		return err
 	}
+
+	listener := new(Listener)
+	listener.engine = e
 	listener.ln = ln
 	listener.addr = ln.Addr()
 	e.listener = listener
@@ -150,4 +117,36 @@ func (e *Engine) GetConn(pd int) Conn {
 		panic("fd conn is not exist")
 	}
 	return e.conns[pd]
+}
+
+func (e *Engine) acceptPolling(localOSThread bool) error {
+	if localOSThread {
+		runtime.LockOSThread()
+		defer runtime.UnlockOSThread()
+	}
+
+	for {
+		select {
+		case <-e.exitCh:
+			fmt.Println("engine out")
+			return nil
+		default:
+			nc, err := e.listener.Accept()
+			if err != nil {
+				fmt.Println("[listener] Accept:", err)
+				continue
+			}
+			if nc == nil {
+				continue
+			}
+			ec := nc.(*conn)
+			poller := e.pollerManger.Pick(ec.Fd())
+			if err = poller.AddRead(ec.Fd()); err != nil {
+				fmt.Println("poller.AddRead:", err)
+				nc.Close()
+				continue
+			}
+			e.conns[ec.Fd()] = ec
+		}
+	}
 }
