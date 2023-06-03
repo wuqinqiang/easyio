@@ -7,7 +7,6 @@ package easyio
 import (
 	"context"
 	"errors"
-	"fmt"
 	"net"
 	"sync"
 	"sync/atomic"
@@ -42,6 +41,9 @@ type conn struct {
 func (c *conn) Context() context.Context {
 	return c.ctx
 }
+func (c *conn) write(b []byte) (int, error) {
+	return syscall.Write(c.fd, b)
+}
 
 func (c *conn) Flush() error {
 	if c.closed.Load() {
@@ -52,26 +54,37 @@ func (c *conn) Flush() error {
 		c.mux.Unlock()
 		return nil
 	}
-	n, err := c.Write(c.writeBuffer)
+
+	n, err := c.write(c.writeBuffer)
 	if err != nil && !errors.Is(err, syscall.EINTR) && !errors.Is(err, syscall.EAGAIN) {
-		c.Close()
+		_ = c.Close()
+		c.mux.Unlock()
 		c.poller.removeConn(c)
 		return err
 	}
 	if n <= 0 {
-		return nil
-	}
-	if n < len(c.writeBuffer) {
-		// todo opt
-		c.writeBuffer = c.writeBuffer[n:]
 		c.mux.Unlock()
 		return nil
 	}
-	// reset to read
+
+	byteBuffer := c.poller.e.GetByteBuffer()
+
+	old := c.writeBuffer
+	// handle remaining data
+	if n < len(c.writeBuffer) {
+		c.writeBuffer = byteBuffer.Get(len(c.writeBuffer) - n)
+		copy(c.writeBuffer, old[n:])
+		//give back []byte
+		byteBuffer.Put(old)
+		c.mux.Unlock()
+		return nil
+	}
+	byteBuffer.Put(old)
 	c.writeBuffer = nil
-	c.resetRead()
 	c.mux.Unlock()
 
+	// reset to read
+	c.resetRead()
 	return nil
 }
 
@@ -89,14 +102,42 @@ func (c *conn) Fd() int {
 	return c.fd
 }
 
-func (c *conn) Write(b []byte) (n int, err error) {
-	n, err = syscall.Write(c.fd, b)
-	//todo to store unwritten data
-	return
+func (c *conn) Write(b []byte) (int, error) {
+	if len(b) == 0 {
+		return 0, nil
+	}
+	byteBuffer := c.poller.e.GetByteBuffer()
+
+	c.mux.Lock()
+
+	bufferLen := len(c.writeBuffer)
+	if bufferLen == 0 {
+		n, err := c.write(b)
+		if err != nil && !errors.Is(err, syscall.EINTR) && !errors.Is(err, syscall.EAGAIN) {
+			_ = c.Close()
+			c.mux.Unlock()
+			c.poller.removeConn(c)
+			return 0, err
+		}
+		if n < 0 {
+			n = 0
+		}
+		left := len(b) - n
+		if left > 0 {
+			c.writeBuffer = byteBuffer.Get(left)
+			copy(c.writeBuffer, b[n:])
+			_ = c.poller.ModWrite(c.fd)
+		}
+		c.mux.Unlock()
+		return len(b), nil
+	}
+	c.writeBuffer = append(c.writeBuffer, b...)
+	c.mux.Unlock()
+
+	return len(b), nil
 }
 
 func (c *conn) Close() error {
-	fmt.Println("closed:", c.Fd())
 	c.closed.Store(true)
 	return syscall.Close(c.fd)
 }

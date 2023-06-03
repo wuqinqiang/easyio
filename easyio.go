@@ -40,4 +40,6 @@ func (d *eventHandler) OnRead(ctx context.Context, c Conn) {
 		fmt.Println("OnRead err:", err)
 	}
 	fmt.Println("read data: ", string(b[:n]))
+	n, err = c.Write(b[:n])
+	fmt.Println("write len:", n)
 }

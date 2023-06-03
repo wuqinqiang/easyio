@@ -10,23 +10,11 @@ var (
 	MaxOpenFiles = 1024 * 1024 * 2
 )
 
-type Option func(options *Options)
-
-type Options struct {
-	numPoller int
-	event     EventHandler
-	Listener  func(network, addr string) (net.Listener, error) // Listener for accept conns
-}
-
 func New(network, addr string, fns ...Option) *Engine {
 	e := new(Engine)
 	opts := new(Options)
 	for _, opt := range fns {
 		opt(opts)
-	}
-
-	if opts.Listener == nil {
-		opts.Listener = net.Listen
 	}
 
 	e.options = opts
@@ -61,7 +49,7 @@ func (e *Engine) Start() (err error) {
 
 	listener := new(Listener)
 	listener.engine = e
-	listener.ln = ln
+	listener.listener = ln
 	listener.addr = ln.Addr()
 	e.listener = listener
 
@@ -76,12 +64,21 @@ func (e *Engine) Start() (err error) {
 }
 
 func (e *Engine) init() {
+
+	if e.options.Listener == nil {
+		e.options.Listener = net.Listen
+	}
+
 	if e.options.numPoller <= 0 {
 		e.options.numPoller = runtime.NumCPU()
 	}
-	if e.options.event == nil {
-		e.options.event = new(eventHandler)
+	if e.options.eventHandler == nil {
+		e.options.eventHandler = new(eventHandler)
 	}
+	if e.options.byteBuffer == nil {
+		e.options.byteBuffer = new(BufferDefault)
+	}
+
 	e.conns = make([]Conn, MaxOpenFiles)
 }
 
@@ -102,6 +99,13 @@ func (e *Engine) Stop() error {
 	e.pollerManger.Stop()
 
 	return nil
+}
+
+func (e *Engine) GetByteBuffer() ByteBuffer {
+	return e.options.byteBuffer
+}
+func (e *Engine) GetEventHandler() EventHandler {
+	return e.options.eventHandler
 }
 
 func (e *Engine) AddConn(conn Conn) {
@@ -125,6 +129,8 @@ func (e *Engine) acceptPolling(localOSThread bool) error {
 		defer runtime.UnlockOSThread()
 	}
 
+	handler := e.GetEventHandler()
+
 	for {
 		select {
 		case <-e.exitCh:
@@ -141,6 +147,10 @@ func (e *Engine) acceptPolling(localOSThread bool) error {
 			}
 			ec := nc.(*conn)
 			poller := e.pollerManger.Pick(ec.Fd())
+			ec.poller = poller
+
+			// set ctx
+			ec.ctx = handler.OnOpen(ec)
 			if err = poller.AddRead(ec.Fd()); err != nil {
 				fmt.Println("poller.AddRead:", err)
 				nc.Close()

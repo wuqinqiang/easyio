@@ -8,6 +8,7 @@ package easyio
 
 import (
 	"errors"
+	"fmt"
 	"runtime"
 	"sync/atomic"
 	"syscall"
@@ -57,7 +58,7 @@ func (p *Poller) Wait() error {
 	mesc := -1
 	events := make([]syscall.EpollEvent, 1024)
 
-	handler := p.e.options.event
+	handler := p.e.GetEventHandler()
 
 	for !p.shutdown.Load() {
 		n, err := syscall.EpollWait(p.fd, events, mesc)
@@ -84,6 +85,7 @@ func (p *Poller) Wait() error {
 
 			//写
 			if event.Events&WriteEvents != 0 {
+				fmt.Printf("fd:%d write event\n", event.Fd)
 				c.Flush()
 			}
 
@@ -111,7 +113,7 @@ func (p *Poller) closeConn(c Conn) {
 	c.Close()
 	p.removeConn(c)
 
-	e := p.e.options.event
+	e := p.e.GetEventHandler()
 	if e != nil {
 		e.OnClose(c.Context(), c)
 	}
