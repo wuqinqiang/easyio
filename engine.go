@@ -46,7 +46,7 @@ func (e *Engine) Start() (err error) {
 	fmt.Println("engine start")
 	e.init()
 	// new a listener
-	ln, err := e.options.Listener(e.network, e.addr)
+	ln, err := e.options.listener(e.network, e.addr)
 	if err != nil {
 		return err
 	}
@@ -69,8 +69,8 @@ func (e *Engine) Start() (err error) {
 
 func (e *Engine) init() {
 
-	if e.options.Listener == nil {
-		e.options.Listener = net.Listen
+	if e.options.listener == nil {
+		e.options.listener = net.Listen
 	}
 
 	if e.options.numPoller <= 0 {

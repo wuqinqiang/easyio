@@ -10,7 +10,7 @@ type Option func(options *Options)
 
 type Options struct {
 	numPoller    int
-	Listener     func(network, addr string) (net.Listener, error) // Listener for accept conns
+	listener     func(network, addr string) (net.Listener, error) // Listener for accept conns
 	eventHandler EventHandler
 	byteBuffer   ByteBuffer
 }
@@ -23,7 +23,7 @@ func WithNumPoller(num int) Option {
 
 func WithListener(fn func(network, addr string) (net.Listener, error)) Option {
 	return func(options *Options) {
-		options.Listener = fn
+		options.listener = fn
 	}
 }
 
