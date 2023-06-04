@@ -143,7 +143,6 @@ func (e *Engine) acceptPolling(localOSThread bool) error {
 		default:
 			nc, err := e.listener.Accept()
 			if err != nil {
-				fmt.Println("[listener] Accept:", err)
 				continue
 			}
 			if nc == nil {

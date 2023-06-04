@@ -45,6 +45,7 @@ go run client.go
 
 因为目前只支持linux平台，上面的server端代码，本地其他平台电脑可以使用docker运行
 ```shell
+# cd examples
 make server
 ```
 
