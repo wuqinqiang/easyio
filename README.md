@@ -28,4 +28,28 @@ a simple netpoll implemented using go
 借鉴(模仿)上面框架的实现，用最少的代码实现一个最小化的Non-blocking IO库，然后写一个0到1实现easyio的小课程， 帮助小白理解一些原理。
 然后在这个基础上去扩展(多平台)，去优化(阅读上面框架的代码，参考别人是咋么设计的)来达到学习的效果。
 
+
+### examples run
+
+**server**
+```shell
+# cd examples
+go run server.go
+```
+
+**client**
+```shell
+# cd examples/client
+go run client.go
+```
+
+因为目前只支持linux平台，上面的server端代码，本地其他平台电脑可以使用docker运行
+```shell
+make server
+```
+
+
+
+
+
 最后，让这个世界充满爱～～

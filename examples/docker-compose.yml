@@ -1,0 +1,10 @@
+version: "3.9"
+
+services:
+  easyio:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: easyio
+    ports:
+      - "8090:8090"
