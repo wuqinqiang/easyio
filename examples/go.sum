@@ -2,3 +2,5 @@ github.com/wuqinqiang/easyio v0.0.0-20230509102439-b07e18d5a544 h1:k0b81nHFISswC
 github.com/wuqinqiang/easyio v0.0.0-20230509102439-b07e18d5a544/go.mod h1:PxMgkweK/8tq07/9EI3Jz3yYL8dDT97tl/cRK6gDDtA=
 github.com/wuqinqiang/easyio v0.0.0-20230603091556-b7a41f7d973e h1:bXQl7x8ujMGolHuU75bHp4iidZkvTzrBH+6Gei7F/MM=
 github.com/wuqinqiang/easyio v0.0.0-20230603091556-b7a41f7d973e/go.mod h1:PxMgkweK/8tq07/9EI3Jz3yYL8dDT97tl/cRK6gDDtA=
+github.com/wuqinqiang/easyio v0.0.0-20230604020355-d4da1e44fe1e h1:p09eo6jFpy0UxX8aepqn5Ucp78q2irdbMn9nlt01n3s=
+github.com/wuqinqiang/easyio v0.0.0-20230604020355-d4da1e44fe1e/go.mod h1:PxMgkweK/8tq07/9EI3Jz3yYL8dDT97tl/cRK6gDDtA=
